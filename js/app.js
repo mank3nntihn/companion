@@ -759,19 +759,20 @@ viewer.addEventListener('click', (e) => { if (e.target.closest('[data-vclose]'))
 
 async function openMenu() {
   const session = await db.getSession();
-  const email = session?.user?.email;
+  const user = db.emailToUsername(session?.user?.email);
   const total = state.documents.length;
   const cached = state.documents.filter((d) => state.cachedDocs.has(d.id)).length;
   openSheet('Konto & Offline', `
     ${factsHtml([
-      ['Angemeldet', db.isDemo ? 'Vorschau (Beispieldaten)' : (email || 'nicht angemeldet')],
+      ['Angemeldet', db.isDemo ? 'Vorschau (Beispieldaten)' : (user || 'nicht angemeldet')],
       ['Offline', total ? `${cached} von ${total} Dateien auf diesem Gerät` : 'Noch keine Dateien'],
       ['Stand', state.fetchedAt ? new Date(state.fetchedAt).toLocaleString('de-DE') : '–'],
     ])}
     <div class="gate-actions" style="display:grid;gap:10px">
       ${db.isDemo ? '' : '<button class="btn" data-action="sync">Jetzt aktualisieren</button>'}
       ${db.isDemo ? '<button class="btn btn-ghost" data-action="leave-demo">Vorschau beenden</button>' : ''}
-      ${!db.isDemo && email ? '<button class="btn btn-danger" data-action="sign-out">Abmelden</button>' : ''}
+      ${!db.isDemo && user ? '<button class="btn btn-ghost" data-action="change-password">Passwort ändern</button>' : ''}
+      ${!db.isDemo && user ? '<button class="btn btn-danger" data-action="sign-out">Abmelden</button>' : ''}
     </div>
     <p class="sync-line">Tipp: Im Browser-Menü „Zum Home-Bildschirm“ wählen, dann startet Travel Buddy wie eine App und funktioniert offline.</p>`);
 }
@@ -875,8 +876,17 @@ document.addEventListener('click', async (e) => {
       localStorage.setItem('tb-demo', '1');
       location.href = location.pathname + '?demo';
       break;
-    case 'google':
-      try { await db.signInWithGoogle(); } catch (err) { toast(errText(err)); }
+    case 'change-password':
+      openSheet('Passwort ändern', `
+        <form id="pw-form" autocomplete="on">
+          <label class="field"><span>Neues Passwort</span>
+            <input class="input" type="password" name="pw" minlength="8" required autocomplete="new-password"></label>
+          <label class="field"><span>Noch einmal</span>
+            <input class="input" type="password" name="pw2" minlength="8" required autocomplete="new-password">
+            <small>Mindestens 8 Zeichen.</small></label>
+        </form>`, `
+        <button class="btn btn-ghost" data-close>Abbrechen</button>
+        <button class="btn" form="pw-form" type="submit">Passwort speichern</button>`);
       break;
     case 'share-as-stay': openStayForm(null, { booking_url: el.dataset.url }); break;
     case 'share-as-transport': {
@@ -885,6 +895,36 @@ document.addEventListener('click', async (e) => {
       break;
     }
     default: break;
+  }
+});
+
+document.addEventListener('submit', async (e) => {
+  const form = e.target;
+  if (form.id === 'login-form') {
+    e.preventDefault();
+    const btn = form.querySelector('button[type=submit]');
+    const msg = $('#login-msg');
+    btn.disabled = true;
+    msg.textContent = '';
+    try {
+      await db.signIn(form.username.value, form.password.value);
+      location.reload();
+    } catch (err) {
+      const m = err?.message || '';
+      msg.textContent = /invalid login|invalid credentials/i.test(m)
+        ? 'Benutzername oder Passwort stimmt nicht.'
+        : errText(err);
+      btn.disabled = false;
+    }
+  } else if (form.id === 'pw-form') {
+    e.preventDefault();
+    if (form.pw.value !== form.pw2.value) { toast('Die Passwörter sind nicht gleich.'); return; }
+    if (!canWrite()) return;
+    await withBusy(form, async () => {
+      await db.changePassword(form.pw.value);
+      closeSheet();
+      toast('Passwort gespeichert');
+    });
   }
 });
 
@@ -964,7 +1004,7 @@ async function start() {
   if (!db.isConfigured || !db.sb) {
     showGate(
       'Die Datenbank ist noch nicht verbunden. Trag die Supabase-URL und den Publishable Key in <code>js/config.js</code> ein.',
-      '<button class="btn btn-google" data-action="demo">Vorschau mit Beispieldaten</button>',
+      '<button class="btn btn-light" data-action="demo">Vorschau mit Beispieldaten</button>',
     );
     return;
   }
@@ -976,14 +1016,21 @@ async function start() {
     if (!navigator.onLine && hasCache) { showApp('T'); return; }
     showGate(
       'Eure Unterkünfte und Tickets an einem Ort, auch ohne Internet am Pier.',
-      `<button class="btn btn-google" data-action="google">Mit Google anmelden</button>
+      `<form id="login-form" class="login" autocomplete="on">
+         <label class="field"><span>Benutzername</span>
+           <input class="input" name="username" required autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username"></label>
+         <label class="field"><span>Passwort</span>
+           <input class="input" type="password" name="password" required autocomplete="current-password"></label>
+         <p id="login-msg" class="login-msg" role="alert"></p>
+         <button class="btn btn-light btn-block" type="submit">Anmelden</button>
+       </form>
        <button class="btn btn-ghost" data-action="demo">Vorschau mit Beispieldaten</button>`,
     );
     return;
   }
 
   const email = session.user.email;
-  const name = session.user.user_metadata?.full_name || email;
+  const name = session.user.user_metadata?.username || db.emailToUsername(email);
   showApp(name);
   handleShare();
 
@@ -991,7 +1038,7 @@ async function start() {
     const member = await db.checkMembership(email);
     if (member === false) {
       showGate(
-        `Dein Konto <strong>${esc(email)}</strong> ist noch nicht freigeschaltet. Trag die Adresse in Supabase in die Tabelle <code>members</code> ein.`,
+        `Das Konto <strong>${esc(name)}</strong> ist noch nicht freigeschaltet.`,
         '<button class="btn btn-ghost" data-action="sign-out">Abmelden</button>',
       );
       return;

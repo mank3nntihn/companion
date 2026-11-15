@@ -2,7 +2,7 @@
 // Dokumente (Tickets, Bestätigungen) werden zusätzlich im Cache Storage
 // des Geräts abgelegt, damit sie ohne Internet aufgehen.
 
-import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY, USER_DOMAIN } from './config.js';
 import { demoData, demoTicketSvg } from './demo.js';
 
 const DATA_KEY = 'tb-data-v1';
@@ -60,9 +60,17 @@ export async function getSession() {
   return data.session;
 }
 
-export async function signInWithGoogle() {
-  const redirectTo = location.origin + location.pathname;
-  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+export const usernameToEmail = (u) => `${String(u).trim().toLowerCase()}@${USER_DOMAIN}`;
+export const emailToUsername = (e) => String(e || '').replace(new RegExp(`@${USER_DOMAIN.replace(/\./g, '\\.')}$`), '');
+
+export async function signIn(username, password) {
+  const { data, error } = await sb.auth.signInWithPassword({ email: usernameToEmail(username), password });
+  if (error) throw error;
+  return data.session;
+}
+
+export async function changePassword(password) {
+  const { error } = await sb.auth.updateUser({ password });
   if (error) throw error;
 }
 

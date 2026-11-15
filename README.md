@@ -11,14 +11,16 @@ Vorschau ohne Datenbank: `…/travelbuddy/?demo`
 
 ## Einrichtung
 
-1. **Datenbank**: `supabase/migrations/0001_init.sql` im Supabase SQL Editor ausführen. Legt Tabellen, Zugriffsregeln und den privaten Speicher `documents` an.
-2. **Freischalten**: eure beiden Google-Adressen eintragen:
+1. **Datenbank**: `supabase/migrations/0001_init.sql` und `0002_username_login.sql` im Supabase SQL Editor ausführen (beim Projekt `travelbuddy` schon erledigt).
+2. **Konten anlegen**: im SQL Editor pro Person
    ```sql
-   insert into public.members (email, name) values ('du@gmail.com', 'Robin'), ('sie@gmail.com', '…');
+   select private.create_user('robin', 'ein-sicheres-passwort');
    ```
-3. **Zugangsdaten**: Projekt-URL und Publishable Key in `js/config.js` eintragen.
-4. **Google-Login**: In Supabase unter *Authentication → Sign In / Providers → Google* aktivieren (Client-ID und Secret aus der Google Cloud Console). Unter *Authentication → URL Configuration* die Site-URL `https://mank3nntihn.github.io/travelbuddy/` setzen und als Redirect-URL eintragen.
-5. **Hosting**: In GitHub unter *Settings → Pages* als Quelle „GitHub Actions“ wählen. Jeder Push auf `main` veröffentlicht die Seite.
+   Das Konto ist damit sofort angelegt und freigeschaltet. Benutzernamen: a–z, 0–9, Punkt, Minus, Unterstrich. Das Passwort lässt sich später in der App unter *Konto & Offline* ändern. Eine Registrierung in der App gibt es bewusst nicht.
+3. **Zugangsdaten**: Projekt-URL und Publishable Key stehen in `js/config.js`.
+4. **Hosting**: In GitHub unter *Settings → Pages* als Quelle „GitHub Actions“ wählen. Jeder Push auf `main` veröffentlicht die Seite.
+
+Intern macht die App aus dem Benutzernamen eine Adresse `name@travelbuddy.local`, weil Supabase eine E-Mail braucht. Es werden nie Mails verschickt.
 
 ## Aufbau
 

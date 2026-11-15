@@ -271,7 +271,8 @@ details.past .card { opacity: .72; }
 .btn-danger { background: transparent; border-color: color-mix(in srgb, var(--warn) 50%, transparent); color: var(--warn); }
 .btn-block { width: 100%; }
 .btn:disabled { opacity: .55; }
-.btn-google { background: #fff; color: #1f1f1f; border-color: #dadce0; }
+.btn-light { background: #fff; color: var(--lagoon-ink); }
+@media (prefers-color-scheme: dark) { .btn-light { background: #0E2226; color: #E4ECE8; } }
 
 .copy {
   display: inline-flex; align-items: center; gap: 6px;
@@ -435,6 +436,10 @@ fieldset.group legend { padding: 0; margin: 8px 0 10px; font: 700 1rem var(--dis
 .gate code { background: rgba(0,0,0,.2); padding: 1px 6px; border-radius: 6px; }
 .gate-actions { display: grid; gap: 10px; }
 .gate .btn-ghost { color: #fff; border-color: rgba(255,255,255,.45); }
+.login { text-align: left; }
+.login .field > span { color: rgba(255,255,255,.9); }
+.login .input { background: #fff; color: #12343B; border-color: transparent; }
+.login-msg { min-height: 1.3em; margin: -4px 0 10px; font-weight: 600; color: #FFE3A3; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + var(--safe-b) + 90px); z-index: 50;
