@@ -7,6 +7,7 @@ Unsere gemeinsame App. Läuft im Browser, lässt sich zum Home-Bildschirm hinzuf
 ### Travel Buddy
 - **Tickets**: Flüge, Fähren, Busse, Transfers. Oben steht immer die nächste Abfahrt mit „Da sein“-Zeit, Countdown, Pier/Terminal (öffnet Google Maps) und einem Knopf, der alle Tickets im Vollbild zeigt.
 - **Unterkünfte**: Link aus Booking.com, Agoda, Airbnb oder Hostelworld einfügen, Name und Reisedaten werden aus dem Link übernommen (Airbnb-Links enthalten keinen Namen). Lücken zwischen Unterkünften werden angezeigt.
+- **Route**: Gesamtansicht der Reise als Zeitleiste. Unterkünfte und Fahrten in der richtigen Reihenfolge, „Jetzt“-Markierung, Nächte ohne Unterkunft (Nachtfahrten werden abgezogen).
 - **Offline**: Daten und alle Dateien werden auf dem Handy gespeichert, sobald die App einmal online war. Bearbeiten geht nur mit Internet.
 - **Teilen** (Android): In der Booking/Agoda-App „Teilen“ → „Hafen“ legt direkt eine neue Unterkunft an.
 

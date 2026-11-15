@@ -244,6 +244,155 @@ function syncLine() {
   return `<p class="sync-line">Stand ${esc(time)}.${files}</p>`;
 }
 
+// ================================================================ Seite: Route (Gesamtansicht)
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function addDaysStr(d, n) {
+  return new Date(Date.parse(d + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+}
+
+function nowLocalKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** Fahrt über Nacht? (Ankunft am Folgetag, oder Abfahrt ab 18 Uhr ohne Ankunftszeit) */
+function overnightDate(t) {
+  const dep = dayKey(t.departure_local);
+  if (t.arrival_local) return dayKey(t.arrival_local) > dep ? dep : null;
+  const p = String(t.departure_local).match(/T(\d{2})/);
+  return p && +p[1] >= 18 ? dep : null;
+}
+
+/** Nächte ohne Unterkunft zwischen Reisebeginn und Reiseende, zusammengefasst. */
+function findGaps(stays, transports) {
+  const starts = [...stays.map((s) => s.check_in), ...transports.map((t) => dayKey(t.departure_local))];
+  const ends = [...stays.map((s) => s.check_out), ...transports.map((t) => dayKey(t.arrival_local || t.departure_local))];
+  if (!starts.length) return [];
+  const first = starts.sort()[0];
+  const last = ends.sort().at(-1);
+  const onTheRoad = new Set(transports.map(overnightDate).filter(Boolean));
+  const moveDays = new Set(transports.map((t) => dayKey(t.departure_local)));
+  const gaps = [];
+  let run = null;
+  for (let d = first; d < last; d = addDaysStr(d, 1)) {
+    const covered = stays.some((s) => s.check_in <= d && d < s.check_out);
+    // eine Fahrt mitten in der Lücke heißt: neuer Ort, also neue Lücke
+    if (run && moveDays.has(d) && d !== run.from) { run.to = d; gaps.push(run); run = null; }
+    if (!covered) {
+      if (!run) run = { from: d, nights: 0, travel: 0 };
+      run.nights++;
+      if (onTheRoad.has(d)) run.travel++;
+    } else if (run) { run.to = d; gaps.push(run); run = null; }
+  }
+  if (run) { run.to = last; gaps.push(run); }
+  return gaps.filter((g) => g.nights > g.travel);
+}
+
+let routeScrolled = false;
+
+function renderRoute() {
+  const view = $('#view');
+  const stays = state.stays;
+  const transports = state.transports;
+  if (!stays.length && !transports.length) {
+    view.innerHTML = `
+      <div class="empty">
+        <h2>Noch keine Route</h2>
+        <p>Sobald Tickets und Unterkünfte eingetragen sind, siehst du hier die ganze Reise am Stück.</p>
+      </div>`;
+    return;
+  }
+
+  const items = [];
+  for (const s of stays) {
+    const tm = String(s.check_in_time || '').match(/\d{1,2}:\d{2}/);
+    const time = tm ? tm[0].padStart(5, '0') : '14:00';
+    items.push({ type: 'stay', key: `${s.check_in}T${time}`, end: `${s.check_out}T12:00`, s });
+  }
+  for (const t of transports) {
+    const key = toInputValue(t.departure_local);
+    const end = toInputValue(t.arrival_local) || addMinutesLocal(t.departure_local, 60);
+    items.push({ type: 'transport', key, end, t });
+  }
+  for (const g of findGaps(stays, transports)) {
+    // hinter die Fahrten des Tages, an dem die Lücke beginnt
+    items.push({ type: 'gap', key: `${g.from}T23:58`, end: `${g.to}T12:00`, g });
+  }
+  items.sort((a, b) => a.key.localeCompare(b.key));
+
+  const now = nowLocalKey();
+  const nowIndex = items.findIndex((it) => it.end > now);
+  let html = '<ol class="route">';
+  let lastDay = '';
+  items.forEach((it, i) => {
+    if (i === nowIndex) html += `<li class="r-now" id="route-now"><span>Jetzt</span></li>`;
+    const day = it.key.slice(0, 10);
+    if (day !== lastDay) {
+      html += `<li class="r-day">${esc(dayLabel(day, day.slice(0, 4) !== now.slice(0, 4)))}</li>`;
+      lastDay = day;
+    }
+    const past = it.end <= now ? ' past' : '';
+    if (it.type === 'stay') {
+      const { s } = it;
+      const n = nightsBetween(s.check_in, s.check_out);
+      const docs = docCount('stay_id', s.id);
+      const cur = s.check_in <= now.slice(0, 10) && now.slice(0, 10) < s.check_out;
+      html += `
+        <li class="r-item r-stay${past}${cur ? ' current' : ''}">
+          <span class="r-dot">${icon('bed')}</span>
+          <button class="r-card" data-action="open-stay" data-id="${s.id}">
+            <span class="r-title">${esc(s.name)}</span>
+            <span class="r-sub">${n} ${n === 1 ? 'Nacht' : 'Nächte'}, bis ${esc(dayLabel(s.check_out))}</span>
+            <span class="r-tags">
+              ${cur ? '<span class="chip">Jetzt hier</span>' : ''}
+              <span class="chip plain">${esc(PLATFORMS[s.platform] || 'Sonstige')}</span>
+              ${s.paid ? '' : '<span class="chip warn">nicht bezahlt</span>'}
+              ${docs ? `<span class="chip">${icon('file')}${docs}</span>` : ''}
+            </span>
+          </button>
+        </li>`;
+    } else if (it.type === 'transport') {
+      const { t } = it;
+      const k = KINDS[t.kind] || KINDS.other;
+      const docs = docCount('transport_id', t.id);
+      const arr = t.arrival_local ? `, an ${hhmm(t.arrival_local)}${dayKey(t.arrival_local) !== dayKey(t.departure_local) ? ' (+1)' : ''}` : '';
+      const sub = [t.departure_location, [t.carrier, t.number].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      html += `
+        <li class="r-item r-move${past}">
+          <span class="r-dot">${icon(k.icon)}</span>
+          <button class="r-card" data-action="open-transport" data-id="${t.id}">
+            <span class="r-time">${hhmm(t.departure_local)}${esc(arr)}</span>
+            <span class="r-title">${routeHtml(t)}</span>
+            ${sub ? `<span class="r-sub">${esc(sub)}</span>` : ''}
+            ${docs ? `<span class="r-tags"><span class="chip">${icon('file')}${docs} Ticket${docs === 1 ? '' : 's'}</span></span>` : ''}
+          </button>
+        </li>`;
+    } else {
+      const { g } = it;
+      const open = g.nights - g.travel;
+      html += `
+        <li class="r-item r-gap${past}">
+          <span class="r-dot">${icon('bed')}</span>
+          <div class="r-card">
+            <span class="r-title">${open} ${open === 1 ? 'Nacht' : 'Nächte'} ohne Unterkunft</span>
+            <span class="r-sub">${esc(dayLabel(g.from))} bis ${esc(dayLabel(g.to))}${g.travel ? `. ${g.travel === 1 ? 'Die Nacht' : `Die ${g.travel} Nächte`} unterwegs ${g.travel === 1 ? 'ist' : 'sind'} schon abgezogen.` : ''}</span>
+          </div>
+        </li>`;
+    }
+  });
+  if (nowIndex === -1) html += `<li class="r-now"><span>Reise vorbei</span></li>`;
+  html += '</ol>' + syncLine();
+  view.innerHTML = html;
+
+  if (!routeScrolled) {
+    routeScrolled = true;
+    const mark = $('#route-now');
+    if (mark) requestAnimationFrame(() => mark.scrollIntoView({ block: 'center' }));
+  }
+}
+
 // ================================================================ Detail: Ticket
 
 function openTransportDetail(id) {
@@ -790,12 +939,26 @@ export default {
   tabs: [
     { id: 'tickets', label: 'Tickets', icon: 'other' },
     { id: 'stays', label: 'Unterkünfte', icon: 'bed' },
+    { id: 'route', label: 'Route', icon: 'route' },
   ],
   render(sub) {
-    $('#add-btn').setAttribute('aria-label', sub === 'stays' ? 'Unterkunft hinzufügen' : 'Ticket hinzufügen');
-    if (sub === 'stays') renderStays(); else renderTickets();
+    const labels = { stays: 'Unterkunft hinzufügen', route: 'Hinzufügen', tickets: 'Ticket hinzufügen' };
+    $('#add-btn').setAttribute('aria-label', labels[sub] || labels.tickets);
+    if (sub !== 'route') routeScrolled = false;
+    if (sub === 'stays') renderStays();
+    else if (sub === 'route') renderRoute();
+    else renderTickets();
   },
-  onAdd(sub) { if (sub === 'stays') openStayForm(); else openTransportForm(); },
+  onAdd(sub) {
+    if (sub === 'stays') openStayForm();
+    else if (sub === 'route') {
+      openSheet('Hinzufügen', `
+        <div style="display:grid;gap:10px">
+          <button class="btn" data-action="new-transport">${icon('other')}Ticket</button>
+          <button class="btn btn-ghost" data-action="new-stay">${icon('bed')}Unterkunft</button>
+        </div>`);
+    } else openTransportForm();
+  },
   refreshEvery: 30000,
   isBusy: () => viewer.open,
   handleAction,

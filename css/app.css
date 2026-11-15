@@ -498,3 +498,56 @@ a.tile:active { transform: scale(.99); }
 }
 .tile-soon .tile-icon { background: transparent; color: var(--muted); border: 1.5px dashed var(--line); }
 .tile-soon .tile-name { font-size: 1.05rem; color: var(--muted); }
+
+/* ------------------------------------------------------------ Route (Gesamtansicht) */
+
+.route { list-style: none; margin: 8px 0 0; padding: 0 0 0 4px; position: relative; }
+.route::before {
+  content: ''; position: absolute; left: 21px; top: 10px; bottom: 10px;
+  width: 3px; border-radius: 2px; background: var(--line);
+}
+.r-day {
+  position: relative; margin: 18px 0 8px 48px;
+  font-weight: 700; font-size: .88rem; color: var(--ink-2);
+}
+.r-day:first-child { margin-top: 4px; }
+.r-item { position: relative; display: grid; grid-template-columns: 36px 1fr; gap: 12px; margin-bottom: 10px; }
+.r-dot {
+  position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 1.15rem;
+  background: var(--card); color: var(--lagoon-ink); border: 2px solid var(--lagoon);
+}
+.r-card {
+  display: grid; gap: 3px; width: 100%; min-width: 0; text-align: left;
+  padding: 11px 14px; border-radius: var(--r-md);
+  background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); color: inherit;
+}
+button.r-card:active { transform: scale(.995); }
+.r-title { font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.r-sub { font-size: .86rem; color: var(--muted); }
+.r-time { font: 700 1rem/1.1 var(--display); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.r-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.r-tags:empty { display: none; }
+
+/* Unterkünfte sind die "Stationen": kräftiger Punkt, größerer Name */
+.r-stay .r-dot { background: var(--lagoon); color: #fff; border-color: var(--lagoon); }
+.r-stay .r-title { font: 700 1.08rem/1.25 var(--display); }
+.r-stay.current .r-card { border-color: var(--lagoon); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lagoon) 40%, transparent), var(--shadow); }
+
+/* Fahrten: schlanker, ohne Schatten */
+.r-move .r-card { box-shadow: none; background: transparent; border-style: solid; }
+
+/* Lücken */
+.r-gap .r-dot { background: var(--sand); color: var(--warn); border: 2px dashed var(--warn); }
+.r-gap .r-card { background: color-mix(in srgb, var(--warn) 9%, transparent); border: 1.5px dashed color-mix(in srgb, var(--warn) 55%, transparent); box-shadow: none; }
+.r-gap .r-title { color: var(--warn); }
+
+.r-item.past { opacity: .55; }
+.r-item.past .r-dot { border-color: var(--line); }
+.r-stay.past .r-dot { background: var(--muted); border-color: var(--muted); }
+
+.r-now { position: relative; display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; }
+.r-now::before { content: ''; flex: none; width: 14px; height: 14px; margin-left: 15px; border-radius: 50%; background: var(--sun); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sun) 35%, transparent); position: relative; z-index: 1; }
+.r-now::after { content: ''; flex: 1; height: 2px; background: var(--sun); order: 2; }
+.r-now span { order: 1; padding-left: 2px; font-weight: 800; font-size: .8rem; color: var(--sun-ink); background: var(--sun); border-radius: 99px; padding: 2px 9px; }
+@media (prefers-color-scheme: dark) { .r-now span { color: #2A2207; } }
