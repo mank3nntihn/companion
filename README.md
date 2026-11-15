@@ -8,10 +8,16 @@ Unsere gemeinsame App. Läuft im Browser, lässt sich zum Home-Bildschirm hinzuf
 - **Tickets**: Flüge, Fähren, Busse, Transfers. Oben steht immer die nächste Abfahrt mit „Da sein“-Zeit, Countdown, Pier/Terminal (öffnet Google Maps) und einem Knopf, der alle Tickets im Vollbild zeigt.
 - **Unterkünfte**: Link aus Booking.com, Agoda, Airbnb oder Hostelworld einfügen, Name und Reisedaten werden aus dem Link übernommen (Airbnb-Links enthalten keinen Namen). Lücken zwischen Unterkünften werden angezeigt.
 - **Route**: Gesamtansicht der Reise als Zeitleiste. Unterkünfte und Fahrten in der richtigen Reihenfolge, „Jetzt“-Markierung, Nächte ohne Unterkunft (Nachtfahrten werden abgezogen).
+- **Menü ☰** (oben rechts im Modul):
+  - **Dokumente**: Pass, Visum, Versicherung, Impfpass als Foto/PDF, offline. Warnt, wenn etwas vor Reiseende abläuft.
+  - **Notfall**: aktuelle Unterkunft groß zum Zeigen (z. B. für Taxifahrer), Notrufnummern Thailand/Indonesien (das aktuelle Land zuerst), eigene Kontakte, Sperr-Notruf.
+  - **Merkliste**: Strände, Essen, Ausflüge pro Ort. Der Ort, an dem ihr gerade seid, steht oben, und die Startseite zeigt die passenden Tipps.
+  - **To-dos**: frei oder an eine Fahrt/Unterkunft gehängt, dann auch in deren Details.
+  - **In Kalender übernehmen**: .ics-Datei mit allen kommenden Fahrten und zwei Erinnerungen (1 Std. vor „Da sein“ und zur „Da sein“-Zeit), optional Unterkünfte als ganztägige Einträge.
 - **Offline**: Daten und alle Dateien werden auf dem Handy gespeichert, sobald die App einmal online war. Bearbeiten geht nur mit Internet.
 - **Teilen** (Android): In der Booking/Agoda-App „Teilen“ → „Hafen“ legt direkt eine neue Unterkunft an.
 
-Vorschau ohne Datenbank: `…/travelbuddy/?demo`
+Vorschau ohne Datenbank: `…/companion/?demo`
 
 ## Einrichtung
 
@@ -38,7 +44,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt.
 | `js/app.js` | Hülle: Anmeldung, Startseite, Navigation, Konto-Menü |
 | `js/core/` | Gemeinsames: Daten und Offline-Cache, Router, UI-Bausteine, Zeitzonen |
 | `js/modules/index.js` | Liste aller Module |
-| `js/modules/travel/` | Modul Travel Buddy |
+| `js/modules/travel/` | Modul Travel Buddy (`index.js` Tickets/Unterkünfte/Route, `extras.js` Menü-Seiten) |
 | `sw.js` | Service Worker (Offline) |
 | `supabase/migrations/` | Datenbank-Schema |
 

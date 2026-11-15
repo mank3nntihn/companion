@@ -18,6 +18,7 @@ const SHELL = [
   './js/core/ui.js',
   './js/modules/index.js',
   './js/modules/travel/index.js',
+  './js/modules/travel/extras.js',
   './js/modules/travel/links.js',
   './js/modules/travel/demo.js',
   './manifest.webmanifest',

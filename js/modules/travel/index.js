@@ -14,6 +14,7 @@ import {
 } from '../../core/time.js';
 import { PLATFORMS, parseStayLink, detectPlatform, extractUrl, mapsUrl } from './links.js';
 import { demoData, demoTicketSvg } from './demo.js';
+import * as extras from './extras.js';
 
 db.registerTable('stays', 'check_in');
 db.registerTable('transports', 'departure_local');
@@ -418,15 +419,25 @@ function openTransportDetail(id) {
     ${factsHtml(facts)}
     <div class="detail-actions">
       ${safeUrl(t.booking_url) ? `<a class="btn btn-ghost" href="${esc(t.booking_url)}" target="_blank" rel="noopener">${icon('ext')}Buchung öffnen</a>` : ''}
+      <button class="btn btn-ghost" data-action="calendar-one" data-id="${t.id}">${icon('cal')}In Kalender</button>
     </div>
     <div class="section-title" style="margin-top:4px">Tickets & Bestätigungen</div>
     ${docsHtml('transport_id', t.id)}
+    ${extras.todosHtml('transport_id', t.id)}
   `, `
     <button class="btn btn-danger" data-action="delete-transport" data-id="${t.id}">Löschen</button>
     <button class="btn" data-action="edit-transport" data-id="${t.id}">Bearbeiten</button>`);
   loadThumbs();
 }
 
+
+// Welche Detailansicht nach Datei-Änderungen wieder geöffnet wird
+const reopeners = {
+  transport_id: (id) => openTransportDetail(id),
+  stay_id: (id) => openStayDetail(id),
+  travel_doc_id: (id) => extras.openDocDetail(id),
+};
+const parentField = (doc) => Object.keys(reopeners).find((f) => doc[f]);
 
 function docsHtml(field, id) {
   const docs = state.documents.filter((d) => d[field] === id);
@@ -486,6 +497,7 @@ function openStayDetail(id) {
     </div>
     <div class="section-title" style="margin-top:4px">Bestätigungen</div>
     ${docsHtml('stay_id', s.id)}
+    ${extras.todosHtml('stay_id', s.id)}
   `, `
     <button class="btn btn-danger" data-action="delete-stay" data-id="${s.id}">Löschen</button>
     <button class="btn" data-action="edit-stay" data-id="${s.id}">Bearbeiten</button>`);
@@ -495,6 +507,7 @@ function openStayDetail(id) {
 // ================================================================ Formular: Unterkunft
 
 let pendingFiles = [];
+function resetPending() { pendingFiles = []; }
 
 function fileField() {
   return `
@@ -745,7 +758,7 @@ async function uploadNow(input) {
     try { await db.uploadDocument(file, { [field]: parentId }); ok++; } catch (e) { toast(`${file.name}: ${errText(e)}`); }
   }
   if (ok) toast(ok === 1 ? 'Datei gespeichert' : `${ok} Dateien gespeichert`);
-  if (field === 'transport_id') openTransportDetail(parentId); else openStayDetail(parentId);
+  reopeners[field]?.(parentId);
   rerender();
 }
 
@@ -839,7 +852,7 @@ function handleAction(action, el) {
     }
     case 'view-doc': {
       const doc = state.documents.find((d) => d.id === el.dataset.doc);
-      const field = doc.transport_id ? 'transport_id' : 'stay_id';
+      const field = parentField(doc);
       const all = db.docsFor(field, doc[field]);
       openViewer([doc, ...all.filter((d) => d !== doc)], doc.label || doc.file_name);
       return true;
@@ -849,7 +862,8 @@ function handleAction(action, el) {
       if (!doc || !canWrite() || !confirm(`„${doc.file_name}“ löschen?`)) return true;
       db.deleteDocument(doc).then(() => {
         toast('Datei gelöscht');
-        if (doc.transport_id) openTransportDetail(doc.transport_id); else openStayDetail(doc.stay_id);
+        const f = parentField(doc);
+        reopeners[f]?.(doc[f]);
         rerender();
       }).catch((err) => toast(errText(err)));
       return true;
@@ -877,7 +891,7 @@ function handleAction(action, el) {
       openTransportForm();
       $('#transport-form').booking_url.value = el.dataset.url;
       return true;
-    default: return false;
+    default: return extras.handleAction(action, el);
   }
 }
 
@@ -924,9 +938,21 @@ function card() {
     lines.push(`<li>${icon('bed')}<span><strong>${esc(stay.name)}</strong>
       ${now ? `bis ${esc(dayLabel(stay.check_out))}` : `ab ${esc(dayLabel(stay.check_in))}`}</span></li>`);
   }
+  const tip = extras.placesHere();
+  if (tip) lines.push(`<li>${icon('star')}<span><strong>${tip.count} ${tip.count === 1 ? 'Tipp' : 'Tipps'} für ${esc(tip.area)}</strong>auf eurer Merkliste</span></li>`);
+  const openTodos = (state.todos || []).filter((t) => !t.done).length;
+  if (openTodos) lines.push(`<li>${icon('todo')}<span><strong>${openTodos} offene${openTodos === 1 ? 's' : ''} To-do${openTodos === 1 ? '' : 's'}</strong></span></li>`);
   if (!lines.length) return '<p class="tile-empty">Noch nichts eingetragen.</p>';
   return `<ul class="tile-list">${lines.join('')}</ul>`;
 }
+
+// ================================================================ Für extras.js
+
+export {
+  KINDS, depUtc, beThere, routeHtml, sortedTransports, nextTransport,
+  docsHtml, loadThumbs, openViewer, fileField, uploadPending, resetPending,
+  openTransportDetail, openStayDetail,
+};
 
 // ================================================================ Modul
 
@@ -936,6 +962,8 @@ export default {
   description: 'Tickets und Unterkünfte, auch offline.',
   icon: 'ferry',
   title: () => TRIP_NAME,
+  pageTitle: (sub) => extras.PAGE_TITLES[sub] || TRIP_NAME,
+  menu: extras.MENU,
   tabs: [
     { id: 'tickets', label: 'Tickets', icon: 'other' },
     { id: 'stays', label: 'Unterkünfte', icon: 'bed' },
@@ -945,12 +973,14 @@ export default {
     const labels = { stays: 'Unterkunft hinzufügen', route: 'Hinzufügen', tickets: 'Ticket hinzufügen' };
     $('#add-btn').setAttribute('aria-label', labels[sub] || labels.tickets);
     if (sub !== 'route') routeScrolled = false;
-    if (sub === 'stays') renderStays();
+    if (extras.PAGE_TITLES[sub]) extras.render(sub);
+    else if (sub === 'stays') renderStays();
     else if (sub === 'route') renderRoute();
     else renderTickets();
   },
   onAdd(sub) {
-    if (sub === 'stays') openStayForm();
+    if (extras.PAGE_TITLES[sub]) extras.onAdd(sub);
+    else if (sub === 'stays') openStayForm();
     else if (sub === 'route') {
       openSheet('Hinzufügen', `
         <div style="display:grid;gap:10px">

@@ -62,11 +62,13 @@ function render() {
 
   const back = $('#back-btn');
   const title = $('#page-title');
+  const menuBtn = $('#drawer-btn');
   const tabbar = $('#tabbar');
   const add = $('#add-btn');
 
   if (!m) {
     back.hidden = true;
+    menuBtn.hidden = true;
     title.textContent = APP_NAME;
     tabbar.hidden = true;
     add.hidden = true;
@@ -77,7 +79,8 @@ function render() {
 
   currentSub = sub || m.tabs?.[0]?.id || '';
   back.hidden = false;
-  title.textContent = m.title ? m.title() : m.name;
+  menuBtn.hidden = !m.menu?.length;
+  title.textContent = m.pageTitle?.(currentSub) || (m.title ? m.title() : m.name);
   add.hidden = !m.onAdd;
 
   if (m.tabs?.length) {
@@ -94,6 +97,34 @@ function render() {
 }
 
 setRenderer(render);
+
+// ================================================================ Modul-Menü (☰)
+
+const drawer = $('#drawer');
+
+function openDrawer() {
+  if (!current?.menu?.length) return;
+  drawer.innerHTML = `
+    <div class="drawer-head">
+      <h2>${esc(current.name)}</h2>
+      <button class="icon-btn" data-drawer-close aria-label="Menü schließen">${icon('close')}</button>
+    </div>
+    <nav class="drawer-list">
+      ${current.menu.map((it) => {
+        const inner = `<span class="drawer-icon">${icon(it.icon)}</span>
+          <span class="drawer-text">${esc(it.label)}<small>${esc(it.hint || '')}</small></span>`;
+        return it.route
+          ? `<a href="#/${current.id}/${it.route}" ${it.route === currentSub ? 'aria-current="page"' : ''}>${inner}</a>`
+          : `<button data-action="${esc(it.action)}">${inner}</button>`;
+      }).join('')}
+    </nav>
+    <a class="drawer-home" href="#/">${icon('back')}Zur Startseite</a>`;
+  drawer.showModal();
+}
+
+drawer.addEventListener('click', (e) => {
+  if (e.target === drawer || e.target.closest('[data-drawer-close]') || e.target.closest('a')) drawer.close();
+});
 
 // ================================================================ Konto-Menü
 
@@ -266,9 +297,14 @@ document.addEventListener('submit', async (e) => {
 });
 
 $('#add-btn').addEventListener('click', () => current?.onAdd?.(currentSub));
-$('#back-btn').addEventListener('click', () => go('#/'));
+$('#back-btn').addEventListener('click', () => {
+  // Von einer Menü-Seite zurück ins Modul, sonst zur Startseite
+  const onTab = !current?.tabs?.length || current.tabs.some((t) => t.id === currentSub);
+  go(onTab ? '#/' : `#/${current.id}`);
+});
+$('#drawer-btn').addEventListener('click', openDrawer);
 $('#menu-btn').addEventListener('click', openMenu);
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => { if (drawer.open) drawer.close(); render(); });
 
 function updateNet() { $('#net-status').hidden = navigator.onLine || db.isDemo; }
 window.addEventListener('online', () => { updateNet(); sync(); });
