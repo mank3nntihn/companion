@@ -6,6 +6,17 @@
   <title>Hafen</title>
   <meta name="description" content="Unsere gemeinsame App: Reisen und mehr, auch offline.">
   <meta name="theme-color" content="#12343B">
+  <script>
+    // Gewähltes Design sofort setzen, bevor die Seite gezeichnet wird
+    try {
+      var t = JSON.parse(localStorage.getItem('companion-theme') || 'null');
+      if (t) {
+        for (var k in t.vars) document.documentElement.style.setProperty(k, t.vars[k]);
+        document.documentElement.style.colorScheme = t.scheme;
+        document.querySelector('meta[name="theme-color"]').content = t.vars['--sand'];
+      }
+    } catch (e) {}
+  </script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

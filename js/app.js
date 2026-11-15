@@ -9,6 +9,11 @@ import {
   sheet, openSheet, closeSheet, withBusy, factsHtml,
 } from './core/ui.js';
 import { modules, findModule } from './modules/index.js';
+import {
+  THEMES, MODES, getSettings, applyTheme, updateSettings, setRemoteSaver, adoptRemote,
+} from './core/theme.js';
+
+applyTheme();
 import { extractUrl } from './modules/travel/links.js';
 
 let current = null; // aktives Modul oder null (Übersicht)
@@ -66,6 +71,18 @@ function render() {
   const menuBtn = $('#drawer-btn');
   const tabbar = $('#tabbar');
   const add = $('#add-btn');
+
+  if (module === 'settings') {
+    current = null;
+    back.hidden = false;
+    menuBtn.hidden = true;
+    title.textContent = 'Einstellungen';
+    tabbar.hidden = true;
+    add.hidden = true;
+    document.body.classList.remove('has-tabs');
+    renderSettings();
+    return;
+  }
 
   if (!m) {
     back.hidden = true;
@@ -128,6 +145,87 @@ drawer.addEventListener('click', (e) => {
 });
 
 // ================================================================ Konto-Menü
+
+// ================================================================ Einstellungen
+
+async function renderSettings() {
+  const st = getSettings();
+  const session = db.isDemo ? null : await db.getSession().catch(() => null);
+  const user = db.emailToUsername(session?.user?.email);
+  const total = state.documents.length;
+  const cached = state.documents.filter((d) => state.cachedDocs.has(d.id)).length;
+  const dark = st.mode === 'dark' || (st.mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const startOptions = [['home', 'Übersicht'], ...modules.filter((m) => m.render).map((m) => [m.id, m.name])];
+
+  $('#view').innerHTML = `
+    <section class="set-section">
+      <h2 class="set-title">Design</h2>
+      <div class="theme-grid">
+        ${Object.entries(THEMES).map(([id, t]) => {
+          const c = t[dark ? 'dark' : 'light'];
+          const card = c['--card'] || '#FFFFFF';
+          return `
+          <button class="theme-card${st.theme === id ? ' is-on' : ''}" data-action="set-theme" data-theme="${id}" aria-pressed="${st.theme === id}">
+            <span class="theme-preview" style="background:${c['--sand']}">
+              <span class="tp-stub" style="background:${c['--sun']};color:${c['--sun-ink']}">09:30</span>
+              <span class="tp-card" style="background:${card};border-color:${c['--line']}">
+                <i style="background:${c['--lagoon']}"></i><b style="background:${c['--ink']}"></b>
+              </span>
+            </span>
+            <span class="theme-name">${esc(t.name)}<small>${esc(t.hint)}</small></span>
+          </button>`;
+        }).join('')}
+      </div>
+      <p class="page-intro">Das Design gilt nur für dein Konto. Ihr könnt also jeweils ein eigenes wählen.</p>
+    </section>
+
+    <section class="set-section">
+      <h2 class="set-title">Erscheinungsbild</h2>
+      <div class="segmented" role="radiogroup" aria-label="Erscheinungsbild">
+        ${Object.entries(MODES).map(([id, label]) => `
+          <button role="radio" aria-checked="${st.mode === id}" data-action="set-mode" data-mode="${id}">${esc(label)}</button>`).join('')}
+      </div>
+      <p class="page-intro">„Automatisch“ folgt der Einstellung eures Handys.</p>
+    </section>
+
+    <section class="set-section">
+      <h2 class="set-title">Beim Öffnen starten mit</h2>
+      <div class="segmented" role="radiogroup" aria-label="Startseite">
+        ${startOptions.map(([id, label]) => `
+          <button role="radio" aria-checked="${st.start === id}" data-action="set-start" data-start="${id}">${esc(label)}</button>`).join('')}
+      </div>
+    </section>
+
+    <section class="set-section">
+      <h2 class="set-title">Konto</h2>
+      ${factsHtml([['Angemeldet als', db.isDemo ? 'Vorschau (Beispieldaten)' : (user || 'nicht angemeldet')]])}
+      <div class="set-actions">
+        ${!db.isDemo && user ? '<button class="btn btn-ghost" data-action="change-password">Passwort ändern</button>' : ''}
+        ${!db.isDemo && user ? '<button class="btn btn-danger" data-action="sign-out">Abmelden</button>' : ''}
+        ${db.isDemo ? '<button class="btn btn-ghost" data-action="leave-demo">Vorschau beenden</button>' : ''}
+      </div>
+    </section>
+
+    <section class="set-section">
+      <h2 class="set-title">Offline & Daten</h2>
+      ${factsHtml([
+        ['Dateien', total ? `${cached} von ${total} auf diesem Gerät` : 'Noch keine Dateien'],
+        ['Stand', state.fetchedAt ? new Date(state.fetchedAt).toLocaleString('de-DE') : '–'],
+        ['App-Version', BUILD === 'dev' ? 'lokal' : BUILD],
+      ])}
+      <button class="btn btn-block home-update" data-action="update-app">${icon('refresh')}App und Daten aktualisieren</button>
+      <p class="page-intro">Tipp: Im Browser-Menü „Zum Home-Bildschirm“ wählen, dann startet ${esc(APP_NAME)} wie eine App und funktioniert offline.</p>
+    </section>`;
+}
+
+/** Einstellungen im Konto mitspeichern, damit sie auf jedem Gerät gelten */
+setRemoteSaver(async (settings) => {
+  if (db.isDemo || !db.sb || !navigator.onLine) return;
+  try {
+    const session = await db.getSession();
+    if (session) await db.sb.auth.updateUser({ data: { settings } });
+  } catch (e) { console.warn('Einstellungen nicht im Konto gespeichert', e); }
+});
 
 async function openMenu() {
   const session = await db.getSession();
@@ -217,9 +315,12 @@ async function updateApp(btn) {
 
 // ================================================================ Ereignisse
 
-async function handleCoreAction(action) {
+async function handleCoreAction(action, el) {
   switch (action) {
     case 'sync': await sync({ quiet: false }); openMenu(); return true;
+    case 'set-theme': updateSettings({ theme: el.dataset.theme }); render(); return true;
+    case 'set-mode': updateSettings({ mode: el.dataset.mode }); render(); return true;
+    case 'set-start': updateSettings({ start: el.dataset.start }); render(); return true;
     case 'update-app': await updateApp($('.home-update')); return true;
     case 'sign-out':
       if (!confirm('Abmelden? Die offline gespeicherten Daten werden von diesem Gerät gelöscht.')) return true;
@@ -257,7 +358,7 @@ document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const { action } = el.dataset;
-  if (await handleCoreAction(action)) return;
+  if (await handleCoreAction(action, el)) return;
   const order = current ? [current, ...modules.filter((m) => m !== current)] : modules;
   for (const m of order) if (m.handleAction?.(action, el)) return;
 });
@@ -304,7 +405,7 @@ $('#back-btn').addEventListener('click', () => {
   go(onTab ? '#/' : `#/${current.id}`);
 });
 $('#drawer-btn').addEventListener('click', openDrawer);
-$('#menu-btn').addEventListener('click', openMenu);
+$('#menu-btn').addEventListener('click', () => go('#/settings'));
 window.addEventListener('hashchange', () => { if (drawer.open) drawer.close(); render(); });
 
 function updateNet() { $('#net-status').hidden = navigator.onLine || db.isDemo; }
@@ -330,6 +431,15 @@ function showGate(text, actions) {
   $('#gate').hidden = false;
   $('#gate-text').innerHTML = text;
   $('#gate-actions').innerHTML = actions;
+}
+
+/** Beim Start direkt ins gewählte Modul, wenn keine Adresse vorgegeben ist */
+function openStartPage() {
+  const { start } = getSettings();
+  const bare = !location.hash || location.hash === '#/' || location.hash === '#';
+  if (bare && start !== 'home' && findModule(start)) {
+    history.replaceState(null, '', `${location.pathname}${location.search}#/${start}`);
+  }
 }
 
 function showApp(name) {
@@ -358,6 +468,7 @@ async function start() {
   const hasCache = db.loadCache();
 
   if (db.isDemo) {
+    openStartPage();
     showApp('');
     await db.syncDocuments();
     render();
@@ -377,7 +488,7 @@ async function start() {
   try { session = await db.getSession(); } catch { /* offline */ }
 
   if (!session) {
-    if (!navigator.onLine && hasCache) { showApp(''); return; }
+    if (!navigator.onLine && hasCache) { openStartPage(); showApp(''); return; }
     showGate(
       'Eure gemeinsamen Helfer an einem Ort, auch ohne Internet.',
       `<form id="login-form" class="login" autocomplete="on">
@@ -395,6 +506,8 @@ async function start() {
 
   const email = session.user.email;
   const name = session.user.user_metadata?.username || db.emailToUsername(email);
+  adoptRemote(session.user.user_metadata?.settings);
+  openStartPage();
   showApp(name);
   handleShare();
 

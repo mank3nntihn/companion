@@ -14,6 +14,7 @@ const SHELL = [
   './js/config.js',
   './js/core/data.js',
   './js/core/router.js',
+  './js/core/theme.js',
   './js/core/time.js',
   './js/core/ui.js',
   './js/modules/index.js',

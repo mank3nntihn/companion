@@ -2,6 +2,10 @@
 
 Unsere gemeinsame App. Läuft im Browser, lässt sich zum Home-Bildschirm hinzufügen und funktioniert offline. Auf der Startseite stehen alle Module als Kacheln, mit einer kurzen Vorschau, was gerade ansteht.
 
+## Einstellungen
+
+Über den runden Konto-Knopf oben rechts: Design (Lagune, Rosé, Abendrot, Ozean, Salbei), Hell/Dunkel/Automatisch, Startseite beim Öffnen, Konto, Offline-Stand und App-Version. Design und Optionen werden im Konto gespeichert (`user_metadata.settings`) und gelten pro Person auf allen Geräten. Neue Designs kommen in `js/core/theme.js`.
+
 ## Module
 
 ### Maschenbuch
@@ -45,7 +49,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt.
 | `css/app.css` | Gestaltung (hell/dunkel) |
 | `js/config.js` | App-Name, Reise-Name, Supabase-Zugang |
 | `js/app.js` | Hülle: Anmeldung, Startseite, Navigation, Konto-Menü |
-| `js/core/` | Gemeinsames: Daten und Offline-Cache, Router, UI-Bausteine, Zeitzonen |
+| `js/core/` | Gemeinsames: Daten und Offline-Cache, Router, UI-Bausteine, Zeitzonen, Designs (`theme.js`) |
 | `js/modules/index.js` | Liste aller Module |
 | `js/modules/travel/` | Modul Travel Buddy (`index.js` Tickets/Unterkünfte/Route, `extras.js` Menü-Seiten) |
 | `sw.js` | Service Worker (Offline) |
