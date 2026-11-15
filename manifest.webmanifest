@@ -1,0 +1,27 @@
+{
+  "name": "Travel Buddy",
+  "short_name": "Travel Buddy",
+  "description": "Unterkünfte und Tickets für unsere Reise – auch offline.",
+  "id": "./",
+  "start_url": "./#tickets",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ECEFE9",
+  "theme_color": "#12343B",
+  "lang": "de",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tickets", "url": "./#tickets", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Unterkünfte", "url": "./#stays", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "share_target": {
+    "action": "./",
+    "method": "GET",
+    "params": { "title": "share_title", "text": "share_text", "url": "share_url" }
+  }
+}
