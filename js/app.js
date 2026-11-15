@@ -1,6 +1,6 @@
 // App-Hülle: Anmeldung, Übersicht mit allen Modulen, Navigation, Konto-Menü, Sync.
 
-import { APP_NAME } from './config.js';
+import { APP_NAME, BUILD } from './config.js';
 import * as db from './core/data.js';
 import { state } from './core/data.js';
 import { setRenderer, parseRoute, go } from './core/router.js';
@@ -41,6 +41,7 @@ function renderHome() {
           <span class="tile-name">Bald mehr<small>Hier kommen weitere Erweiterungen dazu.</small></span>
         </div>
       </div>
+      <button class="btn btn-ghost btn-block home-update" data-action="update-app">${icon('refresh')}Aktualisieren</button>
       ${syncLine()}
     </section>`;
 }
@@ -106,6 +107,7 @@ async function openMenu() {
       ['Angemeldet', db.isDemo ? 'Vorschau (Beispieldaten)' : (user || 'nicht angemeldet')],
       ['Offline', total ? `${cached} von ${total} Dateien auf diesem Gerät` : 'Noch keine Dateien'],
       ['Stand', state.fetchedAt ? new Date(state.fetchedAt).toLocaleString('de-DE') : '–'],
+      ['App-Version', BUILD === 'dev' ? 'lokal' : BUILD],
     ])}
     <div style="display:grid;gap:10px">
       ${db.isDemo ? '' : '<button class="btn" data-action="sync">Jetzt aktualisieren</button>'}
@@ -137,11 +139,56 @@ async function sync({ quiet = true } = {}) {
   }
 }
 
+// ================================================================ App-Updates
+
+let swReg = null;
+let reloading = false;
+
+function setupServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const hadController = !!navigator.serviceWorker.controller;
+  // Neue Version hat übernommen: einmal neu laden (nicht beim allerersten Start)
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then((reg) => { swReg = reg; })
+    .catch((e) => console.warn('SW', e));
+}
+
+/** Fragt beim Server nach einer neuen Version. true, wenn eine installiert wird. */
+async function checkForUpdate() {
+  if (!swReg || !navigator.onLine) return false;
+  try { await swReg.update(); } catch { return false; }
+  const next = swReg.installing || swReg.waiting;
+  if (!next) return false;
+  if (swReg.waiting) swReg.waiting.postMessage('skip-waiting');
+  return true;
+}
+
+async function updateApp(btn) {
+  if (!navigator.onLine) { toast('Offline. Aktualisieren geht nur mit Internet.'); return; }
+  if (btn) btn.disabled = true;
+  toast('Wird aktualisiert …');
+  const [hasUpdate] = await Promise.all([checkForUpdate(), sync({ quiet: true })]);
+  if (hasUpdate) {
+    toast('Neue Version wird geladen …');
+    // Fallback, falls controllerchange ausbleibt
+    setTimeout(() => { if (!reloading) location.reload(); }, 4000);
+    return;
+  }
+  if (btn) btn.disabled = false;
+  toast('Alles aktuell');
+}
+
 // ================================================================ Ereignisse
 
 async function handleCoreAction(action) {
   switch (action) {
     case 'sync': await sync({ quiet: false }); openMenu(); return true;
+    case 'update-app': await updateApp($('.home-update')); return true;
     case 'sign-out':
       if (!confirm('Abmelden? Die offline gespeicherten Daten werden von diesem Gerät gelöscht.')) return true;
       await db.signOut();
@@ -230,6 +277,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
   if (!sheet.open) render();
   sync();
+  checkForUpdate();
 });
 
 // Ansichten mit Countdown regelmäßig auffrischen
@@ -268,9 +316,7 @@ async function start() {
   document.title = APP_NAME;
   $('#gate-title').textContent = APP_NAME;
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW', e));
-  }
+  setupServiceWorker();
 
   const hasCache = db.loadCache();
 

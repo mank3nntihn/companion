@@ -1,7 +1,11 @@
 // Service Worker: hält die App-Hülle offline bereit.
 // Daten und Ticket-Dateien legt die App selbst im Gerätespeicher ab.
+//
+// Updates: Bei jedem Deployment setzt GitHub Actions VERSION auf den Commit.
+// Dadurch ist sw.js neu, der Browser installiert ihn, lädt alle Dateien frisch
+// in einen eigenen Cache, übernimmt sofort und die Seite lädt sich neu.
 
-const VERSION = 'tb-shell-v2';
+const VERSION = 'tb-shell-v3';
 const SHELL = [
   './',
   './index.html',
@@ -25,23 +29,28 @@ const CDN = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
 ];
 const RUNTIME = 'tb-runtime-v1';
+const DOCS = 'tb-docs-v1';
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(VERSION);
-    await cache.addAll(SHELL);
-    // CDN-Dateien einzeln, damit ein Ausfall die Installation nicht blockiert
+    // "reload" umgeht den HTTP-Cache, damit wirklich die neuen Dateien kommen
+    await cache.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })));
     await Promise.all(CDN.map((u) => cache.add(new Request(u, { mode: 'cors' })).catch(() => {})));
-    self.skipWaiting();
+    await self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    const keep = new Set([VERSION, RUNTIME, 'tb-docs-v1']);
+    const keep = new Set([VERSION, RUNTIME, DOCS]);
     for (const k of await caches.keys()) if (!keep.has(k)) await caches.delete(k);
     await self.clients.claim();
   })());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'skip-waiting') self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -56,20 +65,25 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
-        const res = await fetch(req);
-        const cache = await caches.open(VERSION);
-        cache.put('./index.html', res.clone());
-        return res;
+        return await fetch(req, { cache: 'no-store' });
       } catch {
-        return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+        const cache = await caches.open(VERSION);
+        return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
       }
     })());
     return;
   }
 
-  // Eigene Dateien: aus dem Cache, im Hintergrund aktualisieren
+  // Eigene Dateien: aus dem Cache dieser Version (passt immer zusammen)
   if (url.origin === self.location.origin) {
-    event.respondWith(staleWhileRevalidate(req, VERSION));
+    event.respondWith((async () => {
+      const cache = await caches.open(VERSION);
+      const hit = await cache.match(req, { ignoreSearch: true });
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (res.ok) cache.put(req, res.clone());
+      return res;
+    })());
     return;
   }
 
@@ -84,13 +98,3 @@ self.addEventListener('fetch', (event) => {
     })());
   }
 });
-
-async function staleWhileRevalidate(req, cacheName) {
-  const cache = await caches.open(cacheName);
-  const hit = await cache.match(req, { ignoreSearch: true });
-  const net = fetch(req).then((res) => {
-    if (res.ok) cache.put(req, res.clone());
-    return res;
-  }).catch(() => null);
-  return hit || (await net) || Response.error();
-}

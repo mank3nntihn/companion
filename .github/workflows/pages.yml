@@ -22,8 +22,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Cache-Version im Service Worker setzen
-        run: sed -i "s/tb-shell-v[0-9]*/tb-shell-${GITHUB_SHA::8}/" sw.js
+      - name: Version setzen (Service Worker und App)
+        run: |
+          sed -i "s/tb-shell-v[0-9]*/tb-shell-${GITHUB_SHA::8}/" sw.js
+          sed -i "s/BUILD = 'dev'/BUILD = '${GITHUB_SHA::7}, $(TZ=Europe/Berlin date '+%d.%m. %H:%M')'/" js/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -11,3 +11,6 @@ export const APP_NAME = 'Hafen';
 
 // Name der aktuellen Reise im Modul Travel Buddy
 export const TRIP_NAME = 'Thailand & Bali';
+
+// Wird beim Deployment automatisch gesetzt (Commit und Datum)
+export const BUILD = 'dev';
