@@ -13,7 +13,11 @@ create table if not exists public.members (
 
 alter table public.members enable row level security;
 
-create or replace function public.is_member()
+create schema if not exists private;
+grant usage on schema private to authenticated;
+
+-- Hilfsfunktion im internen Schema, nicht über die API aufrufbar
+create or replace function private.is_member()
 returns boolean
 language sql
 stable
@@ -26,12 +30,12 @@ as $$
   );
 $$;
 
-revoke all on function public.is_member() from public;
-grant execute on function public.is_member() to authenticated;
+revoke all on function private.is_member() from public, anon;
+grant execute on function private.is_member() to authenticated;
 
 drop policy if exists "members read" on public.members;
 create policy "members read" on public.members
-  for select to authenticated using ((select public.is_member()));
+  for select to authenticated using ((select private.is_member()));
 
 -- ---------------------------------------------------------------------------
 -- Unterkünfte
@@ -151,8 +155,8 @@ begin
     execute format('drop policy if exists "members all" on public.%I', t);
     execute format(
       'create policy "members all" on public.%I for all to authenticated
-         using ((select public.is_member()))
-         with check ((select public.is_member()))', t);
+         using ((select private.is_member()))
+         with check ((select private.is_member()))', t);
   end loop;
 end $$;
 
@@ -166,22 +170,22 @@ on conflict (id) do update set public = false, file_size_limit = excluded.file_s
 drop policy if exists "documents members select" on storage.objects;
 create policy "documents members select" on storage.objects
   for select to authenticated
-  using (bucket_id = 'documents' and (select public.is_member()));
+  using (bucket_id = 'documents' and (select private.is_member()));
 
 drop policy if exists "documents members insert" on storage.objects;
 create policy "documents members insert" on storage.objects
   for insert to authenticated
-  with check (bucket_id = 'documents' and (select public.is_member()));
+  with check (bucket_id = 'documents' and (select private.is_member()));
 
 drop policy if exists "documents members update" on storage.objects;
 create policy "documents members update" on storage.objects
   for update to authenticated
-  using (bucket_id = 'documents' and (select public.is_member()));
+  using (bucket_id = 'documents' and (select private.is_member()));
 
 drop policy if exists "documents members delete" on storage.objects;
 create policy "documents members delete" on storage.objects
   for delete to authenticated
-  using (bucket_id = 'documents' and (select public.is_member()));
+  using (bucket_id = 'documents' and (select private.is_member()));
 
 -- ---------------------------------------------------------------------------
 -- Eure beiden Google-E-Mail-Adressen eintragen (kleingeschrieben), z. B.:
