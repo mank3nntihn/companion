@@ -14,9 +14,21 @@
 //   handleShare(url)                 geteilter Link (optional)
 //   card()                           HTML-Zusammenfassung für die Kachel (optional)
 //   refreshEvery                     ms, wie oft die Ansicht neu gezeichnet wird (optional)
+//
+// Eigenständige Apps (eigenes Repo, eigene Datenbank) kommen nur als Link auf die
+// Startseite: { id, name, description, icon, href }
 
 import travel from './travel/index.js';
 
-export const modules = [travel];
+const maschenbuch = {
+  id: 'maschenbuch',
+  name: 'Maschenbuch',
+  description: 'Strick- und Häkelbegleiter, eigene App',
+  icon: 'yarn',
+  href: 'https://mank3nntihn.github.io/maschenbuch/',
+};
 
-export const findModule = (id) => modules.find((m) => m.id === id);
+export const modules = [travel, maschenbuch];
+
+/** Nur Module, die in Companion selbst laufen (keine Links) */
+export const findModule = (id) => modules.find((m) => m.id === id && m.render);

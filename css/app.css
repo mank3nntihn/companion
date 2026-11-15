@@ -661,3 +661,27 @@ button.r-card:active { transform: scale(.995); }
 .ba-name { font: 800 2rem/1.15 var(--display); }
 .ba-addr { font-size: 1.6rem; line-height: 1.35; font-weight: 600; }
 .ba-phone { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ To-dos nach Kategorie */
+
+.todo-cat { margin-bottom: 18px; }
+.todo-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 2px 6px; }
+.todo-head h3 { margin: 0; font: 700 1.05rem/1.2 var(--display); }
+.todo-head span { font-size: .82rem; color: var(--muted); white-space: nowrap; }
+.progress { height: 4px; margin: 0 2px 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--lagoon); border-radius: 2px; }
+.todo-cat.all-done .todo-head h3 { color: var(--muted); }
+.add-row { padding: 2px 8px 2px 6px !important; }
+.quick-add.inline { margin: 0; align-items: center; gap: 4px; flex: 1; }
+.quick-add.inline .add-plus { width: 44px; height: 40px; display: grid; place-items: center; color: var(--muted); font-size: 1.1rem; flex: none; }
+.quick-add.inline .input { border: 0; background: transparent; min-height: 40px; padding: 8px 4px; }
+.quick-add.inline .input:focus { box-shadow: none; }
+.done-list { margin: 6px 2px 0; }
+.done-list summary { cursor: pointer; list-style: none; padding: 6px 0; font-size: .86rem; font-weight: 600; color: var(--muted); }
+.done-list summary::-webkit-details-marker { display: none; }
+.done-list summary::before { content: '▸ '; }
+.done-list[open] summary::before { content: '▾ '; }
+.done-list .checklist { opacity: .8; }
+
+.tile-ext { margin-left: auto; align-self: flex-start; color: var(--muted); font-size: 1.1rem; }
+.tile-link .tile-icon { background: color-mix(in srgb, var(--lagoon) 16%, var(--card)); color: var(--lagoon-ink); }

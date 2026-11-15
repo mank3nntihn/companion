@@ -32,9 +32,10 @@ db.registerDemo(() => ({
     { id: 'd-p3', area: 'Koh Phi Phi', name: 'Viewpoint', category: 'sight', done: false },
   ],
   todos: [
-    { id: 'd-td1', text: 'Bargeld für den Pier bereithalten', done: false, transport_id: 'd-t1' },
-    { id: 'd-td2', text: 'Online-Check-in erledigen', done: false, transport_id: 'd-t3' },
-    { id: 'd-td3', text: 'Sonnencreme kaufen', done: true },
+    { id: 'd-td1', text: 'Bargeld für den Pier bereithalten', done: false, transport_id: 'd-t1', category: 'Unterwegs', sort: 10 },
+    { id: 'd-td2', text: 'Online-Check-in erledigen', done: false, transport_id: 'd-t3', category: 'Unterwegs', sort: 20 },
+    { id: 'd-td3', text: 'Sonnencreme kaufen', done: true, category: 'Packen', sort: 110 },
+    { id: 'd-td4', text: 'Reiseapotheke', done: false, category: 'Packen', sort: 120 },
   ],
 }));
 
@@ -449,8 +450,10 @@ function todoLink(t) {
 }
 
 function todoSortKey(t) {
-  return t.due_on || todoLink(t)?.sortKey || '9999';
+  return t.due_on || todoLink(t)?.sortKey || String(t.sort ?? 9999).padStart(6, '0');
 }
+
+const NO_CAT = 'Allgemein';
 
 function todoItem(t, { showLink = true } = {}) {
   const link = showLink ? todoLink(t) : null;
@@ -465,30 +468,89 @@ function todoItem(t, { showLink = true } = {}) {
     </li>`;
 }
 
+/** Kategorien in der Reihenfolge, in der sie angelegt wurden */
+function todoCategories() {
+  const first = new Map();
+  for (const t of state.todos || []) {
+    const c = t.category || NO_CAT;
+    const k = t.sort ?? 1e9;
+    if (!first.has(c) || k < first.get(c)) first.set(c, k);
+  }
+  return [...first.entries()].sort((a, b) => a[1] - b[1]).map(([c]) => c);
+}
+
+function nextSort(category) {
+  const all = state.todos || [];
+  const inCat = all.filter((t) => (t.category || NO_CAT) === (category || NO_CAT));
+  const pool = inCat.length ? inCat : all;
+  return Math.max(0, ...pool.map((t) => t.sort || 0)) + (inCat.length ? 10 : 100);
+}
+
+const openTodoCats = new Set();
+
 function renderTodos() {
   const view = $('#view');
   const list = state.todos || [];
-  const open = list.filter((t) => !t.done).sort((a, b) => todoSortKey(a).localeCompare(todoSortKey(b)));
-  const done = list.filter((t) => t.done);
+  if (!list.length) {
+    view.innerHTML = `
+      <div class="empty">
+        <h2>Noch keine To-dos</h2>
+        <p>Legt To-dos mit Kategorie an, oder hängt sie an eine Fahrt oder Unterkunft. Dann erscheinen sie auch dort in den Details.</p>
+        <button class="btn" data-action="new-todo">${icon('plus')}To-do hinzufügen</button>
+      </div>`;
+    return;
+  }
+  const cats = todoCategories();
+  const totalOpen = list.filter((t) => !t.done).length;
   view.innerHTML = `
-    <form id="todo-quick" class="quick-add" autocomplete="off">
-      <input class="input" name="text" placeholder="Neues To-do …" aria-label="Neues To-do">
-      <button class="btn" type="submit" aria-label="Hinzufügen">${icon('plus')}</button>
-    </form>
-    ${open.length ? `<ul class="checklist">${open.map((t) => todoItem(t)).join('')}</ul>`
-      : '<div class="empty"><h2>Alles erledigt</h2><p>Neue To-dos oben eintippen. Mit Fahrt oder Unterkunft verknüpft erscheinen sie auch dort in den Details.</p></div>'}
-    ${done.length ? `<details class="past"><summary>Erledigt (${done.length})</summary><ul class="checklist">${done.map((t) => todoItem(t)).join('')}</ul></details>` : ''}`;
-  $('#todo-quick').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const text = e.target.text.value.trim();
-    if (!text || !canWrite()) return;
-    try {
-      await db.save('todos', { text });
-      rerender();
-      $('#todo-quick')?.text.focus();
-    } catch (err) { toast(errText(err)); }
-  });
+    <p class="page-intro">${totalOpen} offen, ${list.length - totalOpen} erledigt. Für euch beide gleich.</p>
+    ${cats.map((c) => {
+      const items = list.filter((t) => (t.category || NO_CAT) === c);
+      const open = items.filter((t) => !t.done).sort((a, b) => todoSortKey(a).localeCompare(todoSortKey(b)));
+      const done = items.filter((t) => t.done).sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+      const pct = Math.round((done.length / items.length) * 100);
+      return `
+      <section class="todo-cat${open.length ? '' : ' all-done'}">
+        <div class="todo-head">
+          <h3>${esc(c)}</h3>
+          <span>${done.length} von ${items.length} erledigt</span>
+        </div>
+        <div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div>
+        <ul class="checklist">
+          ${open.map((t) => todoItem(t)).join('')}
+          <li class="add-row">
+            <form class="quick-add inline" data-todo-cat="${esc(c)}" autocomplete="off">
+              <span class="add-plus">${icon('plus')}</span>
+              <input class="input" name="text" placeholder="Hinzufügen" aria-label="To-do in ${esc(c)} hinzufügen">
+            </form>
+          </li>
+        </ul>
+        ${done.length ? `<details class="done-list" data-cat="${esc(c)}"${openTodoCats.has(c) ? ' open' : ''}><summary>${done.length} erledigt</summary>
+          <ul class="checklist">${done.map((t) => todoItem(t)).join('')}</ul></details>` : ''}
+      </section>`;
+    }).join('')}`;
+  view.querySelectorAll('details.done-list').forEach((d) => d.addEventListener('toggle', () => {
+    if (d.open) openTodoCats.add(d.dataset.cat); else openTodoCats.delete(d.dataset.cat);
+  }));
 }
+
+// Schnell-Eingabe in einer Kategorie
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('[data-todo-cat]');
+  if (!form) return;
+  e.preventDefault();
+  const text = form.text.value.trim();
+  if (!text || !canWrite()) return;
+  const cat = form.dataset.todoCat;
+  const category = cat === NO_CAT ? null : cat;
+  try {
+    await db.save('todos', { text, category, sort: nextSort(category) });
+    rerender();
+    // Fokus bleibt in derselben Kategorie, damit man mehrere hintereinander tippen kann
+    const again = [...document.querySelectorAll('[data-todo-cat]')].find((f) => f.dataset.todoCat === cat);
+    again?.text.focus();
+  } catch (err) { toast(errText(err)); }
+});
 
 /** To-do-Abschnitt in den Details einer Fahrt oder Unterkunft. */
 export function todosHtml(field, id) {
@@ -512,7 +574,7 @@ document.addEventListener('submit', async (e) => {
   const field = form.dataset.todoFor;
   const id = form.dataset.todoId;
   try {
-    await db.save('todos', { text, [field]: id });
+    await db.save('todos', { text, [field]: id, category: 'Unterwegs', sort: nextSort('Unterwegs') });
     reopenParent(field, id);
     rerender();
   } catch (err) { toast(errText(err)); }
@@ -532,6 +594,9 @@ function openTodoForm(id) {
   openSheet(id ? 'To-do bearbeiten' : 'Neues To-do', `
     <form id="todo-form" autocomplete="off">
       <label class="field"><span>Was?</span><input class="input" name="text" required value="${esc(t.text)}"></label>
+      <label class="field"><span>Kategorie</span>
+        <input class="input" name="category" list="todo-cats" value="${esc(t.category || '')}" placeholder="z. B. Wohnen & Umzug">
+        <datalist id="todo-cats">${todoCategories().filter((c) => c !== NO_CAT).map((c) => `<option value="${esc(c)}">`).join('')}</datalist></label>
       <label class="field"><span>Erledigen bis (optional)</span><input class="input" type="date" name="due_on" value="${esc(t.due_on)}"></label>
       <label class="field"><span>Gehört zu (optional)</span><select class="input" name="link">
         <option value="">nichts</option>
@@ -550,6 +615,8 @@ function openTodoForm(id) {
       await db.save('todos', {
         ...(id ? { id } : {}),
         text: f.text.trim(), due_on: f.due_on || null,
+        category: f.category.trim() || null,
+        ...(id ? {} : { sort: nextSort(f.category.trim() || null) }),
         transport_id: kind === 't' ? ref : null, stay_id: kind === 's' ? ref : null,
       });
       closeSheet();

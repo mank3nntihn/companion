@@ -29,10 +29,11 @@ function renderHome() {
       <p class="home-hello">${esc(greeting())}</p>
       <div class="tiles">
         ${modules.map((m) => `
-          <a class="tile" href="#/${m.id}">
+          <a class="tile${m.href ? ' tile-link' : ''}" href="${m.href ? esc(m.href) : `#/${m.id}`}"${m.href ? ' target="_blank" rel="noopener"' : ''}>
             <div class="tile-head">
               <span class="tile-icon">${icon(m.icon)}</span>
               <span class="tile-name">${esc(m.name)}<small>${esc(m.description)}</small></span>
+              ${m.href ? `<span class="tile-ext" aria-label="öffnet separat">${icon('ext')}</span>` : ''}
             </div>
             ${m.card ? m.card() : ''}
           </a>`).join('')}
