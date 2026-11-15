@@ -1,9 +1,8 @@
-// Datenschicht: Supabase online, lokaler Cache offline.
-// Dokumente (Tickets, Bestätigungen) werden zusätzlich im Cache Storage
-// des Geräts abgelegt, damit sie ohne Internet aufgehen.
+// Datenschicht für alle Module: Supabase online, lokaler Cache offline.
+// Module melden ihre Tabellen mit registerTable() an. Dateien (z. B. Tickets)
+// werden zusätzlich im Cache Storage des Geräts abgelegt.
 
-import { SUPABASE_URL, SUPABASE_KEY, USER_DOMAIN } from './config.js';
-import { demoData, demoTicketSvg } from './demo.js';
+import { SUPABASE_URL, SUPABASE_KEY, USER_DOMAIN } from '../config.js';
 
 const DATA_KEY = 'tb-data-v1';
 const DOC_CACHE = 'tb-docs-v1';
@@ -22,12 +21,27 @@ export const sb = (!isDemo && isConfigured && window.supabase)
 const dataKey = () => (isDemo ? DATA_KEY + '-demo' : DATA_KEY);
 
 export const state = {
-  stays: [],
-  transports: [],
   documents: [],
   fetchedAt: null,
   cachedDocs: new Set(),
 };
+
+// Tabellen, die beim Aktualisieren geladen werden: name -> Sortierspalte
+const tables = { documents: 'created_at' };
+const demoProviders = [];
+let docFallback = null;
+
+/** Ein Modul meldet eine Tabelle an, die geladen und offline gespeichert wird. */
+export function registerTable(name, orderBy = 'created_at') {
+  tables[name] = orderBy;
+  if (!state[name]) state[name] = [];
+}
+
+/** Beispieldaten für die Vorschau (?demo). fn() liefert {tabelle: [...]} */
+export function registerDemo(fn) { demoProviders.push(fn); }
+
+/** Vorschau-Dateien ohne Datenbank, fn(doc) -> Blob oder null */
+export function registerDocFallback(fn) { docFallback = fn; }
 
 // ---------------------------------------------------------------- Cache
 
@@ -35,15 +49,19 @@ export function loadCache() {
   try {
     const raw = localStorage.getItem(dataKey());
     if (raw) Object.assign(state, JSON.parse(raw), { cachedDocs: state.cachedDocs });
-    else if (isDemo) Object.assign(state, demoData());
+    else if (isDemo) {
+      for (const fn of demoProviders) Object.assign(state, fn());
+      state.fetchedAt = new Date().toISOString();
+    }
   } catch { /* leerer Cache */ }
   return !!state.fetchedAt || isDemo;
 }
 
 function saveCache() {
-  const { stays, transports, documents, fetchedAt } = state;
+  const out = { fetchedAt: state.fetchedAt };
+  for (const t of Object.keys(tables)) out[t] = state[t];
   try {
-    localStorage.setItem(dataKey(), JSON.stringify({ stays, transports, documents, fetchedAt }));
+    localStorage.setItem(dataKey(), JSON.stringify(out));
   } catch { /* Speicher voll – ignorieren */ }
 }
 
@@ -91,16 +109,11 @@ export async function checkMembership(email) {
 
 export async function refresh() {
   if (isDemo) { saveCache(); return; }
-  const [s, t, d] = await Promise.all([
-    sb.from('stays').select('*').order('check_in'),
-    sb.from('transports').select('*').order('departure_local'),
-    sb.from('documents').select('*').order('created_at'),
-  ]);
-  const err = s.error || t.error || d.error;
-  if (err) throw err;
-  state.stays = s.data;
-  state.transports = t.data;
-  state.documents = d.data;
+  const names = Object.keys(tables);
+  const results = await Promise.all(names.map((t) => sb.from(t).select('*').order(tables[t])));
+  const failed = results.find((r) => r.error);
+  if (failed) throw failed.error;
+  names.forEach((t, i) => { state[t] = results[i].data; });
   state.fetchedAt = new Date().toISOString();
   saveCache();
 }
@@ -137,7 +150,7 @@ export async function save(table, row) {
 }
 
 export async function remove(table, id) {
-  const docs = state.documents.filter((d) => d.stay_id === id || d.transport_id === id);
+  const docs = state.documents.filter((d) => Object.entries(d).some(([k, v]) => k.endsWith('_id') && k !== 'id' && v === id));
   if (!isDemo) {
     if (docs.length) await sb.storage.from(BUCKET).remove(docs.map((d) => d.storage_path));
     const { error } = await sb.from(table).delete().eq('id', id);
@@ -154,7 +167,8 @@ export async function remove(table, id) {
 const safeName = (n) => n.normalize('NFKD').replace(/[^\w.\-]+/g, '_').slice(-80);
 
 export async function uploadDocument(file, parent) {
-  const folder = parent.stay_id ? `stays/${parent.stay_id}` : `transports/${parent.transport_id}`;
+  const [key, val] = Object.entries(parent)[0];
+  const folder = `${key.replace(/_id$/, '')}/${val}`;
   const path = `${folder}/${crypto.randomUUID()}-${safeName(file.name || 'dokument')}`;
   const row = {
     ...parent,
@@ -212,9 +226,9 @@ export async function getDocBlob(doc) {
     const hit = await c.match(docKey(doc));
     if (hit) return hit.blob();
   }
-  if (isDemo && doc.storage_path.startsWith('demo/')) {
-    const t = state.transports.find((x) => x.id === doc.transport_id);
-    return new Blob([demoTicketSvg(doc.file_name.replace(/\.svg$/, ''), t?.confirmation_code || 'DEMO')], { type: 'image/svg+xml' });
+  if (isDemo && docFallback) {
+    const blob = docFallback(doc);
+    if (blob) return blob;
   }
   if (isDemo || !sb) throw new Error('Datei ist auf diesem Gerät nicht gespeichert.');
   const { data, error } = await sb.storage.from(BUCKET).download(doc.storage_path);

@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cache-Version im Service Worker setzen
-        run: sed -i "s/tb-shell-v1/tb-shell-${GITHUB_SHA::8}/" sw.js
+        run: sed -i "s/tb-shell-v[0-9]*/tb-shell-${GITHUB_SHA::8}/" sw.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,11 +1,14 @@
-# Travel Buddy
+# Hafen
 
-Unsere Reise-App für Unterkünfte und Tickets. Läuft im Browser, lässt sich zum Home-Bildschirm hinzufügen und funktioniert offline, auch die angehängten Tickets.
+Unsere gemeinsame App. Läuft im Browser, lässt sich zum Home-Bildschirm hinzufügen und funktioniert offline. Auf der Startseite stehen alle Module als Kacheln, mit einer kurzen Vorschau, was gerade ansteht.
 
+## Module
+
+### Travel Buddy
 - **Tickets**: Flüge, Fähren, Busse, Transfers. Oben steht immer die nächste Abfahrt mit „Da sein“-Zeit, Countdown, Pier/Terminal (öffnet Google Maps) und einem Knopf, der alle Tickets im Vollbild zeigt.
 - **Unterkünfte**: Link aus Booking.com, Agoda, Airbnb oder Hostelworld einfügen, Name und Reisedaten werden aus dem Link übernommen (Airbnb-Links enthalten keinen Namen). Lücken zwischen Unterkünften werden angezeigt.
 - **Offline**: Daten und alle Dateien werden auf dem Handy gespeichert, sobald die App einmal online war. Bearbeiten geht nur mit Internet.
-- **Teilen** (Android): In der Booking/Agoda-App „Teilen“ → „Travel Buddy“ legt direkt eine neue Unterkunft an.
+- **Teilen** (Android): In der Booking/Agoda-App „Teilen“ → „Hafen“ legt direkt eine neue Unterkunft an.
 
 Vorschau ohne Datenbank: `…/travelbuddy/?demo`
 
@@ -26,14 +29,25 @@ Intern macht die App aus dem Benutzernamen eine Adresse `name@travelbuddy.local`
 
 Reines HTML/CSS/JavaScript ohne Build-Schritt.
 
-| Datei | Inhalt |
+| Pfad | Inhalt |
 | --- | --- |
 | `index.html` | Gerüst, Icons |
 | `css/app.css` | Gestaltung (hell/dunkel) |
-| `js/app.js` | Seiten, Formulare, Ticket-Viewer |
-| `js/data.js` | Supabase, Offline-Cache, Dateien |
-| `js/links.js` | Erkennung von Booking/Agoda/Airbnb-Links |
-| `js/time.js` | Ortszeiten und Zeitzonen |
+| `js/config.js` | App-Name, Reise-Name, Supabase-Zugang |
+| `js/app.js` | Hülle: Anmeldung, Startseite, Navigation, Konto-Menü |
+| `js/core/` | Gemeinsames: Daten und Offline-Cache, Router, UI-Bausteine, Zeitzonen |
+| `js/modules/index.js` | Liste aller Module |
+| `js/modules/travel/` | Modul Travel Buddy |
 | `sw.js` | Service Worker (Offline) |
+| `supabase/migrations/` | Datenbank-Schema |
+
+Adressen: `#/` ist die Startseite, `#/travel/tickets` und `#/travel/stays` sind die Seiten von Travel Buddy.
+
+### Neues Modul hinzufügen
+
+1. Ordner `js/modules/<id>/` mit `index.js` anlegen. Welche Felder ein Modul hat, steht oben in `js/modules/index.js`, als Vorlage dient `js/modules/travel/index.js`.
+2. Modul in `js/modules/index.js` importieren und in die Liste aufnehmen.
+3. Tabellen als neue Datei in `supabase/migrations/` anlegen, mit derselben Zugriffsregel wie die anderen Tabellen (`private.is_member()`), und im Modul per `db.registerTable()` anmelden.
+4. Neue JS-Dateien in `sw.js` unter `SHELL` eintragen, damit sie offline verfügbar sind.
 
 Zeiten von Tickets werden als Ortszeit plus Zeitzone gespeichert: „09:00 ab Phuket“ bleibt 09:00 Thai-Zeit, egal wo das Handy gerade eingestellt ist.

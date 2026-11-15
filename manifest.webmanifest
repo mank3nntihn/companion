@@ -1,9 +1,9 @@
 {
-  "name": "Travel Buddy",
-  "short_name": "Travel Buddy",
-  "description": "Unterkünfte und Tickets für unsere Reise – auch offline.",
+  "name": "Hafen",
+  "short_name": "Hafen",
+  "description": "Unsere gemeinsame App: Reisen und mehr, auch offline.",
   "id": "./",
-  "start_url": "./#tickets",
+  "start_url": "./#/",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -16,8 +16,8 @@
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Tickets", "url": "./#tickets", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Unterkünfte", "url": "./#stays", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Tickets", "url": "./#/travel/tickets", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Unterkünfte", "url": "./#/travel/stays", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ],
   "share_target": {
     "action": "./",

@@ -1,17 +1,21 @@
 // Service Worker: hält die App-Hülle offline bereit.
 // Daten und Ticket-Dateien legt die App selbst im Gerätespeicher ab.
 
-const VERSION = 'tb-shell-v1';
+const VERSION = 'tb-shell-v2';
 const SHELL = [
   './',
   './index.html',
   './css/app.css',
   './js/app.js',
-  './js/data.js',
-  './js/demo.js',
-  './js/links.js',
-  './js/time.js',
   './js/config.js',
+  './js/core/data.js',
+  './js/core/router.js',
+  './js/core/time.js',
+  './js/core/ui.js',
+  './js/modules/index.js',
+  './js/modules/travel/index.js',
+  './js/modules/travel/links.js',
+  './js/modules/travel/demo.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
